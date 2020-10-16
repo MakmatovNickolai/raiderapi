@@ -6,6 +6,11 @@ from models.threatstack import ThreatStackError
 errors = Blueprint('errors', __name__)
 
 
+def initialize_error_handlers(application):
+    from error import errors
+    application.register_blueprint(errors)
+
+
 @errors.app_errorhandler(ThreatStackError)
 def handle_error(error):
     message = [str(x) for x in error.args]
@@ -20,6 +25,7 @@ def handle_error(error):
     }
 
     return jsonify(response), status_code
+
 
 @errors.app_errorhandler(Exception)
 def handle_unexpected_error(error):

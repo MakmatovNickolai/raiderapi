@@ -1,23 +1,45 @@
 import os
 from functools import wraps
 from flask import Flask, request, jsonify
-import db
+from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy.orm import relationship
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy import Integer, ForeignKey, String, Column
 
-def _initialize_errorhandlers(application):
-    '''
-        Initialize error handlers
-    '''
-    from error import errors
-    application.register_blueprint(errors)
-def create_app():
-    application = Flask(__name__)
+import error
 
-    _initialize_errorhandlers(application)
 
-    db.init_db(application)
-    return application
+app = Flask(__name__)
+error.initialize_error_handlers(app)
+current_directory = os.getcwd()
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS '] = False
+app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{current_directory}\\database.db'
+db = SQLAlchemy(app)
+db.create_all()
 
-app = create_app()
+Base = declarative_base()
+
+class Contact(Base):
+    __tablename__ = 'contact'
+    id = Column(Integer, primary_key=True)
+    name = Column(String(140))
+    surname = Column(String(140))
+    age = Column(Integer)
+
+    def __repr__(self):
+        return '<Contact {}>'.format(self.name)
+
+
+class User(Base):
+    __tablename__ = 'user'
+    id = Column(Integer, primary_key=True)
+    email = Column(String(64), index=True, unique=True)
+    password = Column(String(128))
+    contact_id = Column(Integer, ForeignKey('contact.id'))
+    contact = relationship("Contact")
+
+    def __repr__(self):
+        return '<User {}>'.format(self.email)
 
 
 def validate_json(f):
@@ -31,6 +53,7 @@ def validate_json(f):
         return f(*args, **kw)
     return wrapper
 
+
 @app.route('/')
 def index():
     return "Hello, World!"
@@ -39,8 +62,16 @@ def index():
 @app.route('/signup', methods=['POST'])
 @validate_json
 def signup():
-    data = request.json
-    return jsonify(data)
+    user_json = request.json
+    contact = Contact(name=user_json["name"], surname=user_json["surname"], age=user_json["age"])
+    user = User(email=user_json["email"], password=user_json["password"])
+    user.contact = contact
+
+    db.session.add(contact)
+    db.session.add(user)
+    db.session.commit()
+    return "Success"
+
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
