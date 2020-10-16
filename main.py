@@ -1,5 +1,7 @@
 import os
 from functools import wraps
+from platform import system
+
 from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import relationship
@@ -13,11 +15,16 @@ app = Flask(__name__)
 error.initialize_error_handlers(app)
 current_directory = os.getcwd()
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS '] = False
-app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{current_directory}\\database.db'
+system = system()
+if system == "Windows":
+    app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{current_directory}\\database.db'
+else:
+    app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:////{current_directory}/database.db'
 db = SQLAlchemy(app)
 db.create_all()
 
 Base = declarative_base()
+
 
 class Contact(Base):
     __tablename__ = 'contact'
