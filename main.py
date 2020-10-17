@@ -7,7 +7,7 @@ from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import Integer, ForeignKey, String, Column
-
+import hashlib
 import error
 
 
@@ -24,6 +24,8 @@ db = SQLAlchemy(app)
 db.create_all()
 
 Base = declarative_base()
+Salt ="ser_suhkra"
+m = hashlib.sha256()
 
 
 class Contact(Base):
@@ -77,7 +79,33 @@ def signup():
     db.session.add(contact)
     db.session.add(user)
     db.session.commit()
-    return "Success"
+
+    status_code = 200
+    m.update(str.encode(user.email + user.password + Salt))
+    auth_token = m.digest()
+    return jsonify({'status_code': status_code, 'auth_token': auth_token})
+
+
+@app.route('/signin', methods=['POST'])
+@validate_json
+def signin():
+    user_json = request.json
+    user = db.session.query(User).filter_by(email=user_json["email"]).first()
+    status_code = 400
+    auth_token = ''
+
+    if user:
+        if user.password == user_json["password"]:
+            status_code = 200
+            m.update(str.encode(user.email + user.password + Salt))
+            auth_token = m.digest()
+    return jsonify({'status_code': status_code, 'auth_token': auth_token})
+
+
+@app.route('/like', methods=['GET'])
+def like():
+    id = request.args.get('id')
+    return "Het"
 
 
 if __name__ == '__main__':
