@@ -79,10 +79,10 @@ def signup():
     db.session.add(user)
     db.session.commit()
 
-    error = ''
+    err = ''
     inp = user.email + user.password + Salt
     auth_token = hashlib.sha256(inp.encode('utf-8')).hexdigest()
-    return jsonify({'error': error, 'auth_token': auth_token})
+    return jsonify({'error': err, 'auth_token': auth_token})
 
 
 @app.route('/signin', methods=['POST'])
@@ -90,7 +90,7 @@ def signup():
 def signin():
     user_json = request.json
     user = db.session.query(User).filter_by(email=user_json["email"]).first()
-    error = ''
+    err = ''
     auth_token = ''
 
     if user:
@@ -98,16 +98,28 @@ def signin():
             inp = user.email + user.password + Salt
             auth_token = hashlib.sha256(inp.encode('utf-8')).hexdigest()
         else:
-            error = "Wrong password"
+            err = "Wrong password"
     else:
-        error = "No such user"
-    return jsonify({'error': error, 'auth_token': auth_token})
+        err = "No such user"
+    return jsonify({'error': err, 'auth_token': auth_token})
 
 
 @app.route('/like', methods=['GET'])
 def like():
+    err = ''
+    success = False
+    auth_header = request.headers.get('Authorization')
+    if auth_header:
+        auth_token = auth_header.split(" ")[1]
+    else:
+        auth_token = ''
+    if auth_token:
+        success = True
+        err = auth_token
+    else:
+        err = 'No auth token'
     id = request.args.get('id')
-    return "Het"
+    return jsonify({'error': err, 'success': success})
 
 
 if __name__ == '__main__':
