@@ -25,7 +25,6 @@ db.create_all()
 
 Base = declarative_base()
 Salt ="ser_suhkra"
-m = hashlib.sha256()
 
 
 class Contact(Base):
@@ -80,10 +79,10 @@ def signup():
     db.session.add(user)
     db.session.commit()
 
-    status_code = 200
-    m.update(str.encode(user.email + user.password + Salt))
-    auth_token = m.digest()
-    return jsonify({'status_code': status_code, 'auth_token': auth_token})
+    error = ''
+    inp = user.email + user.password + Salt
+    auth_token = hashlib.sha256(inp.encode('utf-8')).hexdigest()
+    return jsonify({'error': error, 'auth_token': auth_token})
 
 
 @app.route('/signin', methods=['POST'])
@@ -91,15 +90,18 @@ def signup():
 def signin():
     user_json = request.json
     user = db.session.query(User).filter_by(email=user_json["email"]).first()
-    status_code = 400
+    error = ''
     auth_token = ''
 
     if user:
         if user.password == user_json["password"]:
-            status_code = 200
-            m.update(str.encode(user.email + user.password + Salt))
-            auth_token = m.digest()
-    return jsonify({'status_code': status_code, 'auth_token': auth_token})
+            inp = user.email + user.password + Salt
+            auth_token = hashlib.sha256(inp.encode('utf-8')).hexdigest()
+        else:
+            error = "Wrong password"
+    else:
+        error = "No such user"
+    return jsonify({'error': error, 'auth_token': auth_token})
 
 
 @app.route('/like', methods=['GET'])
