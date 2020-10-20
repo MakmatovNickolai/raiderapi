@@ -31,14 +31,3 @@ def init_db(app):
             db.commit()
     else:
         print("DB already exists")
-
-def add_user(User):
-
-    g.db.execute(
-        'insert into user (quiz,student,grade) values (?,?,?)',
-        (
-            User.form.get('Quiz', type=int),
-            request.form.get('Student', type=int),
-            request.form.get('grade', type=float)
-        )
-    )
