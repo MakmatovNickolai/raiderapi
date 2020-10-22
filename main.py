@@ -4,6 +4,7 @@ from functools import wraps
 from platform import system
 from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy.exc import DatabaseError
 from sqlalchemy.orm import relationship, sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import Integer, ForeignKey, String, Column, MetaData, Table, create_engine
@@ -26,7 +27,7 @@ engine = create_engine(sqlite_connection_string)
 
 Base = declarative_base(engine)
 Salt ="ser_suhkra"
-
+db = SQLAlchemy(app)
 
 class Serializer(object):
     def serialize(self):
@@ -59,12 +60,16 @@ class Contact(Base, Serializer):
     age = Column(Integer)
     profile_pic = Column(String(140))
     sex = Column(String(10))
-    parent_id = Column(Integer, ForeignKey('user.id'))
+
+    user_id = Column(Integer, ForeignKey('user.id'))
+    user = relationship("User", back_populates="contact")
 
     def serialize(self):
         d = Serializer.serialize(self)
-        if d["parent_id"]:
-            del d["parent_id"]
+        if d["user_id"]:
+            del d["user_id"]
+        if d["user"]:
+            del d["user"]
         return d
 
 
@@ -129,18 +134,32 @@ def index():
 @validate_json
 def signup():
     user_json = request.json
-    contact = Contact(name=user_json["name"], surname=user_json["surname"], age=user_json["age"], sex=user_json["sex"], profile_pic=user_json["profile_pic"])
+
     user = User(email=user_json["email"], password=user_json["password"])
+    contact = Contact(name=user_json["name"], surname=user_json["surname"], age=user_json["age"], sex=user_json["sex"], profile_pic=user_json["profile_pic"])
     user.contact = contact
 
+    inp = user.email + user.password + Salt
+    inp2 = user.email + Salt
+    auth_token = hashlib.sha256(inp.encode('utf-8')).hexdigest()
+    user_random_hash = hashlib.sha256(inp2.encode('utf-8')).hexdigest()
+    user_random_hash = (user_random_hash + "xer").encode('utf-8')
+    user_random_hash = hashlib.sha256().hexdigest()
+    authed_user = AuthedUser(user_id=user.id, auth_token=auth_token, user_random_hash=user_random_hash)
+    session.add(authed_user)
     session.add(contact)
     session.add(user)
-    session.commit()
+    try:
+        session.commit()
+    except DatabaseError as e:
+        session.rollback()
+        print(e)
+
 
     err = ''
     inp = user.email + user.password + Salt
     auth_token = hashlib.sha256(inp.encode('utf-8')).hexdigest()
-    return jsonify({'error': err, 'auth_token': auth_token})
+    return jsonify({'error': err, 'auth_token': auth_token, 'user_random_hash': user_random_hash})
 
 
 @app.route('/signin', methods=['POST'])
@@ -150,17 +169,22 @@ def signin():
     user = session.query(User).filter_by(email=user_json["email"]).first()
     err = ''
     auth_token = ''
-
+    user_random_hash =''
     if user:
         if user.password == user_json["password"]:
             inp = user.email + user.password + Salt
             inp2 = user.email + Salt
             auth_token = hashlib.sha256(inp.encode('utf-8')).hexdigest()
             user_random_hash = hashlib.sha256(inp2.encode('utf-8')).hexdigest()
-            user_random_hash = hashlib.sha256(user_random_hash + "xer".encode('utf-8')).hexdigest()
+            user_random_hash = (user_random_hash + "xer").encode('utf-8')
+            user_random_hash = hashlib.sha256().hexdigest()
             authed_user = AuthedUser(user_id=user.id, auth_token=auth_token, user_random_hash=user_random_hash)
             session.add(authed_user)
-            session.commit()
+            try:
+                session.commit()
+            except DatabaseError as e:
+                session.rollback()
+                print(e)
         else:
             err = "Wrong password"
     else:
