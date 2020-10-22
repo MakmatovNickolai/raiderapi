@@ -37,15 +37,35 @@ class Serializer(object):
         return [m.serialize() for m in l]
 
 
+class User(Base, Serializer):
+    __tablename__ = 'user'
+    id = Column(Integer, primary_key=True)
+    email = Column(String(64), index=True, unique=True)
+    password = Column(String(128))
+    contact = relationship("Contact", uselist=False, back_populates="user")
+
+    def serialize(self):
+        d = Serializer.serialize(self)
+        if d["contact"]:
+            del d["contact"]
+        return d
+
+
 class Contact(Base, Serializer):
     __tablename__ = 'contact'
     id = Column(Integer, primary_key=True)
     name = Column(String(140))
     surname = Column(String(140))
     age = Column(Integer)
+    profile_pic = Column(String(140))
+    sex = Column(String(10))
+    parent_id = Column(Integer, ForeignKey('user.id'))
 
-    def __repr__(self):
-        return '<Contact {}>'.format(self.name)
+    def serialize(self):
+        d = Serializer.serialize(self)
+        if d["parent_id"]:
+            del d["parent_id"]
+        return d
 
 
 class AuthedUser(Base):
@@ -67,24 +87,6 @@ class LikedProfile(Base):
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer)
     liked_ids = Column(String(140))
-
-
-class User(Base, Serializer):
-    __tablename__ = 'user'
-    id = Column(Integer, primary_key=True)
-    email = Column(String(64), index=True, unique=True)
-    password = Column(String(128))
-    contact_id = Column(Integer, ForeignKey('contact.id'))
-    contact = relationship("Contact")
-
-    def serialize(self):
-        d = Serializer.serialize(self)
-        if d["contact"]:
-            del d["contact"]
-        return d
-
-    def __repr__(self):
-        return '<User {}>'.format(self.email)
 
 
 Base.metadata.create_all(engine)
@@ -127,7 +129,7 @@ def index():
 @validate_json
 def signup():
     user_json = request.json
-    contact = Contact(name=user_json["name"], surname=user_json["surname"], age=user_json["age"])
+    contact = Contact(name=user_json["name"], surname=user_json["surname"], age=user_json["age"], sex=user_json["sex"], profile_pic=user_json["profile_pic"])
     user = User(email=user_json["email"], password=user_json["password"])
     user.contact = contact
 
@@ -177,10 +179,10 @@ def fetch_users():
         visited_profiles = session.query(VisitedProfile).filter_by(user_id=authed_user.user_id).first()
         if visited_profiles:
             visited_ids = visited_profiles.visited_ids.split(',')
-            arr = [u for u in session.query(User).filter(User.id.notin_(visited_ids))]
-            result = User.serialize_list(arr)
+            arr = [u for u in session.query(Contact).filter(Contact.id.notin_(visited_ids))]
+            result = Contact.serialize_list(arr)
         else:
-            result = User.serialize_list(session.query(User).all())
+            result = Contact.serialize_list(session.query(Contact).all())
     else:
         err = 'Unexpected error'
 
