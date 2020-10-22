@@ -22,8 +22,9 @@ if system == "Windows":
 
 app.config['SQLALCHEMY_DATABASE_URI'] = sqlite_connection_string
 
-Salt ="ser_suhkra"
+Salt = "ser_suhkra"
 db = SQLAlchemy(app)
+
 
 class Serializer(object):
     def serialize(self):
@@ -32,6 +33,7 @@ class Serializer(object):
     @staticmethod
     def serialize_list(l):
         return [m.serialize() for m in l]
+
 
 class User(db.Model, Serializer):
     __tablename__ = 'user'
@@ -101,6 +103,7 @@ def validate_json(f):
             msg = "not a valid json"
             return jsonify({"error": msg}), 400
         return f(*args, **kw)
+
     return wrapper
 
 
@@ -115,6 +118,7 @@ def require_auth_token(f):
         if not auth_token:
             return jsonify({"error": "No auth token"})
         return f(*args, **kw)
+
     return wrapper
 
 
@@ -129,16 +133,18 @@ def signup():
     user_json = request.json
 
     user = User(email=user_json["email"], password=user_json["password"])
-    contact = Contact(name=user_json["name"], surname=user_json["surname"], age=user_json["age"], sex=user_json["sex"], picture_url=user_json["picture_url"])
+    contact = Contact(name=user_json["name"], surname=user_json["surname"], age=user_json["age"], sex=user_json["sex"],
+                      picture_url=user_json["picture_url"])
     user.contact = contact
     err = ''
     inp = user.email + user.password + Salt
     inp2 = user.email + Salt
     auth_token = hashlib.sha256(inp.encode('utf-8')).hexdigest()
     user_random_hash = hashlib.sha256(inp2.encode('utf-8')).hexdigest()
-    authed_user = AuthedUser(user_id=user.id, auth_token=auth_token, user_random_hash=user_random_hash)
-    user_random_hash = (user_random_hash + "xer").encode('utf-8')
-    user_random_hash = hashlib.sha256().hexdigest()
+
+    user_random_hash1 = (user_random_hash + "xer").encode('utf-8')
+    user_random_hash1 = hashlib.sha256().hexdigest()
+    authed_user = AuthedUser(user_id=user.id, auth_token=auth_token, user_random_hash=user_random_hash1)
     db.session.add(authed_user)
     db.session.add(contact)
     db.session.add(user)
@@ -147,10 +153,8 @@ def signup():
     except DatabaseError as e:
         db.session.rollback()
         err = str(e)
-        auth_token= ''
-        user_random_hash= ''
-
-
+        auth_token = ''
+        user_random_hash = ''
 
     inp = user.email + user.password + Salt
     auth_token = hashlib.sha256(inp.encode('utf-8')).hexdigest()
@@ -164,16 +168,17 @@ def signin():
     user = db.session.query(User).filter_by(email=user_json["email"]).first()
     err = ''
     auth_token = ''
-    user_random_hash =''
+    user_random_hash = ''
     if user:
         if user.password == user_json["password"]:
             inp = user.email + user.password + Salt
             inp2 = user.email + Salt
             auth_token = hashlib.sha256(inp.encode('utf-8')).hexdigest()
             user_random_hash = hashlib.sha256(inp2.encode('utf-8')).hexdigest()
-            authed_user = AuthedUser(user_id=user.id, auth_token=auth_token, user_random_hash=user_random_hash)
-            user_random_hash = (user_random_hash + "xer").encode('utf-8')
-            user_random_hash = hashlib.sha256().hexdigest()
+
+            user_random_hash1 = (user_random_hash + "xer").encode('utf-8')
+            user_random_hash1 = hashlib.sha256().hexdigest()
+            authed_user = AuthedUser(user_id=user.id, auth_token=auth_token, user_random_hash=user_random_hash1)
             db.session.add(authed_user)
             try:
                 db.session.commit()
