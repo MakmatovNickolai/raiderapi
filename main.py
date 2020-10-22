@@ -5,7 +5,6 @@ from platform import system
 from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.exc import DatabaseError
-from sqlalchemy.orm import relationship, sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import Integer, ForeignKey, String, Column, MetaData, Table, create_engine
 import hashlib
@@ -23,9 +22,6 @@ if system == "Windows":
 
 app.config['SQLALCHEMY_DATABASE_URI'] = sqlite_connection_string
 
-engine = create_engine(sqlite_connection_string)
-
-Base = declarative_base(engine)
 Salt ="ser_suhkra"
 db = SQLAlchemy(app)
 
@@ -37,13 +33,12 @@ class Serializer(object):
     def serialize_list(l):
         return [m.serialize() for m in l]
 
-
-class User(Base, Serializer):
+class User(db.Model, Serializer):
     __tablename__ = 'user'
-    id = Column(Integer, primary_key=True)
-    email = Column(String(64), index=True, unique=True)
-    password = Column(String(128))
-    contact = relationship("Contact", uselist=False, back_populates="user")
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(64), index=True, unique=True)
+    password = db.Column(db.String(128))
+    contact = db.relationship("Contact", uselist=False, back_populates="user")
 
     def serialize(self):
         d = Serializer.serialize(self)
@@ -52,17 +47,17 @@ class User(Base, Serializer):
         return d
 
 
-class Contact(Base, Serializer):
+class Contact(db.Model, Serializer):
     __tablename__ = 'contact'
-    id = Column(Integer, primary_key=True)
-    name = Column(String(140))
-    surname = Column(String(140))
-    age = Column(Integer)
-    picture_url = Column(String(140))
-    sex = Column(String(10))
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(140))
+    surname = db.Column(db.String(140))
+    age = db.Column(db.Integer)
+    picture_url = db.Column(db.String(140))
+    sex = db.Column(db.String(10))
 
-    user_id = Column(Integer, ForeignKey('user.id'))
-    user = relationship("User", back_populates="contact")
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    user = db.relationship("User", back_populates="contact")
 
     def serialize(self):
         d = Serializer.serialize(self)
@@ -73,30 +68,28 @@ class Contact(Base, Serializer):
         return d
 
 
-class AuthedUser(Base):
+class AuthedUser(db.Model):
     __tablename__ = 'authed_user'
-    user_id = Column(Integer, primary_key=True)
-    auth_token = Column(String(140))
-    user_random_hash = Column(String(140))
+    user_id = db.Column(db.Integer, primary_key=True)
+    auth_token = db.Column(db.String(140))
+    user_random_hash = db.Column(db.String(140))
 
 
-class VisitedProfile(Base):
+class VisitedProfile(db.Model):
     __tablename__ = 'visited_profile'
-    id = Column(Integer, primary_key=True)
-    user_id = Column(Integer)
-    visited_ids = Column(String(140))
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer)
+    visited_ids = db.Column(db.String(140))
 
 
-class LikedProfile(Base):
+class LikedProfile(db.Model):
     __tablename__ = 'liked_user'
-    id = Column(Integer, primary_key=True)
-    user_id = Column(Integer)
-    liked_ids = Column(String(140))
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer)
+    liked_ids = db.Column(db.String(140))
 
 
-Base.metadata.create_all(engine)
-Session = sessionmaker(engine)
-session = Session()
+db.create_all()
 
 
 def validate_json(f):
@@ -138,7 +131,7 @@ def signup():
     user = User(email=user_json["email"], password=user_json["password"])
     contact = Contact(name=user_json["name"], surname=user_json["surname"], age=user_json["age"], sex=user_json["sex"], picture_url=user_json["picture_url"])
     user.contact = contact
-
+    err = ''
     inp = user.email + user.password + Salt
     inp2 = user.email + Salt
     auth_token = hashlib.sha256(inp.encode('utf-8')).hexdigest()
@@ -146,17 +139,19 @@ def signup():
     user_random_hash = (user_random_hash + "xer").encode('utf-8')
     user_random_hash = hashlib.sha256().hexdigest()
     authed_user = AuthedUser(user_id=user.id, auth_token=auth_token, user_random_hash=user_random_hash)
-    session.add(authed_user)
-    session.add(contact)
-    session.add(user)
+    db.session.add(authed_user)
+    db.session.add(contact)
+    db.session.add(user)
     try:
-        session.commit()
+        db.session.commit()
     except DatabaseError as e:
-        session.rollback()
-        print(e)
+        db.session.rollback()
+        err = str(e)
+        auth_token= ''
+        user_random_hash= ''
 
 
-    err = ''
+
     inp = user.email + user.password + Salt
     auth_token = hashlib.sha256(inp.encode('utf-8')).hexdigest()
     return jsonify({'error': err, 'auth_token': auth_token, 'user_random_hash': user_random_hash})
@@ -166,7 +161,7 @@ def signup():
 @validate_json
 def signin():
     user_json = request.json
-    user = session.query(User).filter_by(email=user_json["email"]).first()
+    user = db.session.query(User).filter_by(email=user_json["email"]).first()
     err = ''
     auth_token = ''
     user_random_hash =''
@@ -179,11 +174,11 @@ def signin():
             user_random_hash = (user_random_hash + "xer").encode('utf-8')
             user_random_hash = hashlib.sha256().hexdigest()
             authed_user = AuthedUser(user_id=user.id, auth_token=auth_token, user_random_hash=user_random_hash)
-            session.add(authed_user)
+            db.session.add(authed_user)
             try:
-                session.commit()
+                db.session.commit()
             except DatabaseError as e:
-                session.rollback()
+                db.session.rollback()
                 print(e)
         else:
             err = "Wrong password"
@@ -198,15 +193,15 @@ def fetch_users():
     err = ''
     result = ''
     user_random_hash = request.args.get('user_random_hash')
-    authed_user = session.query(AuthedUser).filter_by(user_random_hash=user_random_hash).first()
+    authed_user = db.session.query(AuthedUser).filter_by(user_random_hash=user_random_hash).first()
     if authed_user:
-        visited_profiles = session.query(VisitedProfile).filter_by(user_id=authed_user.user_id).first()
+        visited_profiles = db.session.query(VisitedProfile).filter_by(user_id=authed_user.user_id).first()
         if visited_profiles:
             visited_ids = visited_profiles.visited_ids.split(',')
-            arr = [u for u in session.query(Contact).filter(Contact.id.notin_(visited_ids))]
+            arr = [u for u in db.session.query(Contact).filter(Contact.id.notin_(visited_ids))]
             result = Contact.serialize_list(arr)
         else:
-            result = Contact.serialize_list(session.query(Contact).all())
+            result = Contact.serialize_list(db.session.query(Contact).all())
     else:
         err = 'Unexpected error'
 
@@ -221,25 +216,25 @@ def like():
     liked_id = request.args.get('id')
     user_random_hash = request.args.get('user_random_hash')
     success = True
-    authed_user = session.query(AuthedUser).filter_by(user_random_hash=user_random_hash).first()
+    authed_user = db.session.query(AuthedUser).filter_by(user_random_hash=user_random_hash).first()
     if authed_user:
-        visited_profiles = session.query(VisitedProfile).filter_by(user_id=authed_user.user_id).first()
+        visited_profiles = db.session.query(VisitedProfile).filter_by(user_id=authed_user.user_id).first()
         if visited_profiles:
             visited_i = visited_profiles.visited_ids.split(',')
             visited_i.append(liked_id)
             visited_profiles.visited_ids = ','.join(visited_i)
 
-            liked_profiles = session.query(LikedProfile).filter_by(user_id=authed_user.user_id).first()
+            liked_profiles = db.session.query(LikedProfile).filter_by(user_id=authed_user.user_id).first()
             if liked_profiles:
                 liked_ids = liked_profiles.liked_ids.split(',')
                 liked_ids.append(liked_id)
                 liked_profiles.liked_ids = ','.join(liked_ids)
             else:
-                session.add(LikedProfile(user_id=authed_user.user_id, liked_ids=liked_id))
+                db.session.add(LikedProfile(user_id=authed_user.user_id, liked_ids=liked_id))
         else:
-            session.add(VisitedProfile(user_id=authed_user.user_id, visited_ids=liked_id))
-            session.add(LikedProfile(user_id=authed_user.user_id, liked_ids=liked_id))
-        session.commit()
+            db.session.add(VisitedProfile(user_id=authed_user.user_id, visited_ids=liked_id))
+            db.session.add(LikedProfile(user_id=authed_user.user_id, liked_ids=liked_id))
+        db.session.commit()
     else:
         err = 'unexpected error'
     return jsonify({'error': err, 'success': success})
