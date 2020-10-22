@@ -136,9 +136,9 @@ def signup():
     inp2 = user.email + Salt
     auth_token = hashlib.sha256(inp.encode('utf-8')).hexdigest()
     user_random_hash = hashlib.sha256(inp2.encode('utf-8')).hexdigest()
+    authed_user = AuthedUser(user_id=user.id, auth_token=auth_token, user_random_hash=user_random_hash)
     user_random_hash = (user_random_hash + "xer").encode('utf-8')
     user_random_hash = hashlib.sha256().hexdigest()
-    authed_user = AuthedUser(user_id=user.id, auth_token=auth_token, user_random_hash=user_random_hash)
     db.session.add(authed_user)
     db.session.add(contact)
     db.session.add(user)
@@ -171,9 +171,9 @@ def signin():
             inp2 = user.email + Salt
             auth_token = hashlib.sha256(inp.encode('utf-8')).hexdigest()
             user_random_hash = hashlib.sha256(inp2.encode('utf-8')).hexdigest()
+            authed_user = AuthedUser(user_id=user.id, auth_token=auth_token, user_random_hash=user_random_hash)
             user_random_hash = (user_random_hash + "xer").encode('utf-8')
             user_random_hash = hashlib.sha256().hexdigest()
-            authed_user = AuthedUser(user_id=user.id, auth_token=auth_token, user_random_hash=user_random_hash)
             db.session.add(authed_user)
             try:
                 db.session.commit()
