@@ -58,7 +58,7 @@ class Contact(Base, Serializer):
     name = Column(String(140))
     surname = Column(String(140))
     age = Column(Integer)
-    profile_pic = Column(String(140))
+    picture_url = Column(String(140))
     sex = Column(String(10))
 
     user_id = Column(Integer, ForeignKey('user.id'))
@@ -136,7 +136,7 @@ def signup():
     user_json = request.json
 
     user = User(email=user_json["email"], password=user_json["password"])
-    contact = Contact(name=user_json["name"], surname=user_json["surname"], age=user_json["age"], sex=user_json["sex"], profile_pic=user_json["profile_pic"])
+    contact = Contact(name=user_json["name"], surname=user_json["surname"], age=user_json["age"], sex=user_json["sex"], picture_url=user_json["picture_url"])
     user.contact = contact
 
     inp = user.email + user.password + Salt
