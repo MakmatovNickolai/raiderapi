@@ -1,125 +1,12 @@
-import json
-import os
-from functools import wraps
-from platform import system
-from flask import Flask, request, jsonify
-from flask_sqlalchemy import SQLAlchemy
+import uuid
+from datetime import datetime
+
+from flask import request, jsonify
 from sqlalchemy.exc import DatabaseError
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy import Integer, ForeignKey, String, Column, MetaData, Table, create_engine
 import hashlib
-import error
-from sqlalchemy.inspection import inspect
 
-app = Flask(__name__)
-error.initialize_error_handlers(app)
-current_directory = os.getcwd()
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS '] = False
-system = system()
-sqlite_connection_string = f'sqlite:////{current_directory}/database.db'
-if system == "Windows":
-    sqlite_connection_string = f'sqlite:///{current_directory}\\database.db'
-
-app.config['SQLALCHEMY_DATABASE_URI'] = sqlite_connection_string
-
-Salt = "ser_suhkra"
-db = SQLAlchemy(app)
-
-
-class Serializer(object):
-    def serialize(self):
-        return {c: getattr(self, c) for c in inspect(self).attrs.keys()}
-
-    @staticmethod
-    def serialize_list(l):
-        return [m.serialize() for m in l]
-
-
-class User(db.Model, Serializer):
-    __tablename__ = 'user'
-    id = db.Column(db.Integer, primary_key=True)
-    email = db.Column(db.String(64), index=True, unique=True)
-    password = db.Column(db.String(128))
-    contact = db.relationship("Contact", uselist=False, back_populates="user")
-
-    def serialize(self):
-        d = Serializer.serialize(self)
-        if d["contact"]:
-            del d["contact"]
-        return d
-
-
-class Contact(db.Model, Serializer):
-    __tablename__ = 'contact'
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(140))
-    surname = db.Column(db.String(140))
-    age = db.Column(db.Integer)
-    picture_url = db.Column(db.String(140))
-    sex = db.Column(db.String(10))
-
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    user = db.relationship("User", back_populates="contact")
-
-    def serialize(self):
-        d = Serializer.serialize(self)
-        if d["user_id"]:
-            del d["user_id"]
-        if d["user"]:
-            del d["user"]
-        return d
-
-
-class AuthedUser(db.Model):
-    __tablename__ = 'authed_user'
-    user_id = db.Column(db.Integer, primary_key=True)
-    auth_token = db.Column(db.String(140))
-    user_random_hash = db.Column(db.String(140))
-
-
-class VisitedProfile(db.Model):
-    __tablename__ = 'visited_profile'
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer)
-    visited_ids = db.Column(db.String(140))
-
-
-class LikedProfile(db.Model):
-    __tablename__ = 'liked_user'
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer)
-    liked_ids = db.Column(db.String(140))
-
-
-db.create_all()
-
-
-def validate_json(f):
-    @wraps(f)
-    def wrapper(*args, **kw):
-        try:
-            request.json
-        except Exception:
-            msg = "not a valid json"
-            return jsonify({"error": msg}), 400
-        return f(*args, **kw)
-
-    return wrapper
-
-
-def require_auth_token(f):
-    @wraps(f)
-    def wrapper(*args, **kw):
-        auth_header = request.headers.get('Authorization')
-        if auth_header:
-            auth_token = auth_header.split(" ")[1]
-        else:
-            auth_token = ''
-        if not auth_token:
-            return jsonify({"error": "No auth token"})
-        return f(*args, **kw)
-
-    return wrapper
+from db import *
+from wrappers import validate_json, require_auth_token
 
 
 @app.route('/')
@@ -127,15 +14,18 @@ def index():
     return "Hello, World!"
 
 
-@app.route('/signup', methods=['POST'])
+@app.route('/sign_up', methods=['POST'])
 @validate_json
-def signup():
+def sign_up():
     user_json = request.json
-
-    user = User(email=user_json["email"], password=user_json["password"])
-    contact = Contact(name=user_json["name"], surname=user_json["surname"], age=user_json["age"], sex=user_json["sex"],
-                      picture_url=user_json["picture_url"])
-    user.contact = contact
+    user = User(id=user_json['id'],
+                email=user_json['email'],
+                password=user_json["password"],
+                name=user_json["name"],
+                surname=user_json["surname"],
+                age=user_json["age"],
+                sex=user_json["sex"],
+                picture_url=user_json["picture_url"])
     err = ''
     inp = user.email + user.password + Salt
     inp2 = user.email + Salt
@@ -144,9 +34,9 @@ def signup():
 
     user_random_hash1 = (user_random_hash + "xer").encode('utf-8')
     user_random_hash1 = hashlib.sha256(user_random_hash1).hexdigest()
-    authed_user = AuthedUser(user_id=user.id, auth_token=auth_token, user_random_hash=user_random_hash1)
+    authed_user = AuthedUser(auth_token=auth_token, user_random_hash=user_random_hash1)
+    authed_user.user = user
     db.session.add(authed_user)
-    db.session.add(contact)
     db.session.add(user)
     try:
         db.session.commit()
@@ -161,9 +51,9 @@ def signup():
     return jsonify({'error': err, 'auth_token': auth_token, 'user_random_hash': user_random_hash})
 
 
-@app.route('/signin', methods=['POST'])
+@app.route('/sign_in', methods=['POST'])
 @validate_json
-def signin():
+def sign_in():
     user_json = request.json
     user = db.session.query(User).filter_by(email=user_json["email"]).first()
     err = ''
@@ -192,6 +82,22 @@ def signin():
     return jsonify({'error': err, 'auth_token': auth_token, 'user_random_hash': user_random_hash})
 
 
+@app.route('/sign_out', methods=['GET'])
+@validate_json
+def sign_out():
+    user_random_hash = request.args.get('user_random_hash')
+    authed_user = db.session.query(AuthedUser).filter_by(user_random_hash=user_random_hash).first()
+    err = ''
+    result = ''
+    if authed_user:
+        db.session.delete(authed_user)
+        db.session.commit()
+        result = 'OK'
+    else:
+        err = "Unexpected error"
+    return jsonify({'error': err, 'result': result})
+
+
 @app.route('/fetch_users', methods=['GET'])
 @require_auth_token
 def fetch_users():
@@ -200,13 +106,50 @@ def fetch_users():
     user_random_hash = request.args.get('user_random_hash')
     authed_user = db.session.query(AuthedUser).filter_by(user_random_hash=user_random_hash).first()
     if authed_user:
-        visited_profiles = db.session.query(VisitedProfile).filter_by(user_id=authed_user.user_id).first()
-        if visited_profiles:
-            visited_ids = visited_profiles.visited_ids.split(',')
-            arr = [u for u in db.session.query(Contact).filter(Contact.id.notin_(visited_ids))]
-            result = Contact.serialize_list(arr)
-        else:
-            result = Contact.serialize_list(db.session.query(Contact).all())
+
+        right_ids = [r.target_id for r in
+                     db.session.query(SwipeRight.target_id).filter_by(swiper_id=authed_user.user_id).all()]
+        left_ids = [r.target_id for r in
+                    db.session.query(SwipeLeft.target_id).filter_by(swiper_id=authed_user.user_id).all()]
+
+        # возвращаем тех, кого не свайпали влево или вправо и не себя
+        users_list = right_ids + left_ids
+        if authed_user.user_id not in users_list:
+            users_list.append(authed_user.user_id)
+        users = db.session.query(User).filter(User.id.notin_(users_list)).all()
+        result = User.serialize_list(users)
+    else:
+        err = 'Unexpected error'
+
+    return jsonify({'err': err, 'result': result})
+
+
+@app.route('/get_matches', methods=['GET'])
+@require_auth_token
+def get_matches():
+    err = ''
+    result = ''
+    user_random_hash = request.args.get('user_random_hash')
+    match_type = request.args.get('type')
+    authed_user = db.session.query(AuthedUser).filter_by(user_random_hash=user_random_hash).first()
+    if authed_user:
+        if match_type == "both":
+            u = db.aliased(User)
+            matched_users = Match.query \
+                .join(u, u.id == Match.second_user_id) \
+                .with_entities(u) \
+                .filter(Match.first_user_id == authed_user.user_id) \
+                .all()
+            result = User.serialize_list(matched_users)
+        if match_type == "one":
+            sub_query = db.session.query(SwipeRight.target_id).filter_by(swiper_id=authed_user.user_id).subquery()
+            u = db.aliased(User)
+            swiped_me_right_users = db.session.query(SwipeRight) \
+                .join(u, u.id == SwipeRight.swiper_id) \
+                .with_entities(u) \
+                .filter(SwipeRight.swiper_id.notin_(sub_query), SwipeRight.target_id == authed_user.user_id) \
+                .all()
+            result = User.serialize_list(swiped_me_right_users)
     else:
         err = 'Unexpected error'
 
@@ -217,34 +160,154 @@ def fetch_users():
 @require_auth_token
 def like():
     err = ''
-    success = False
-    liked_id = request.args.get('id')
+    target_id = request.args.get('id')
+    is_liked = request.args.get('like')
     user_random_hash = request.args.get('user_random_hash')
-    success = True
+    is_match = False
     authed_user = db.session.query(AuthedUser).filter_by(user_random_hash=user_random_hash).first()
     if authed_user:
-        visited_profiles = db.session.query(VisitedProfile).filter_by(user_id=authed_user.user_id).first()
-        if visited_profiles:
-            visited_i = visited_profiles.visited_ids.split(',')
-            visited_i.append(liked_id)
-            visited_profiles.visited_ids = ','.join(visited_i)
-
-            liked_profiles = db.session.query(LikedProfile).filter_by(user_id=authed_user.user_id).first()
-            if liked_profiles:
-                liked_ids = liked_profiles.liked_ids.split(',')
-                liked_ids.append(liked_id)
-                liked_profiles.liked_ids = ','.join(liked_ids)
-            else:
-                db.session.add(LikedProfile(user_id=authed_user.user_id, liked_ids=liked_id))
+        if is_liked == "1":
+            db.session.add(SwipeRight(swiper_id=authed_user.user_id, target_id=target_id, created_on=datetime.now()))
+            has_match = db.session.query(SwipeRight).filter_by(swiper_id=target_id,
+                                                               target_id=authed_user.user_id).first()
+            if has_match:
+                match1 = Match(first_user_id=target_id, second_user_id=authed_user.user_id, created_on=datetime.now())
+                match2 = Match(first_user_id=authed_user.user_id, second_user_id=target_id, created_on=datetime.now())
+                db.session.add(match1)
+                db.session.add(match2)
+                is_match = True
         else:
-            db.session.add(VisitedProfile(user_id=authed_user.user_id, visited_ids=liked_id))
-            db.session.add(LikedProfile(user_id=authed_user.user_id, liked_ids=liked_id))
+            db.session.add(SwipeLeft(swiper_id=authed_user.user_id, target_id=target_id, created_on=datetime.now()))
         db.session.commit()
     else:
         err = 'unexpected error'
-    return jsonify({'error': err, 'success': success})
+    return jsonify({'error': err, 'is_match': is_match})
+
+
+@app.route('/fetch_rooms', methods=['GET'])
+@require_auth_token
+def fetch_rooms():
+    err = ''
+    result = []
+    user_random_hash = request.args.get('user_random_hash')
+    authed_user = db.session.query(AuthedUser).filter_by(user_random_hash=user_random_hash).first()
+    room = ''
+    user = ''
+    last_messages = ''
+    if authed_user:
+        # подзапрос, чтобы вытащить последнее сообщение в беседе
+        sub_query = db.session.query(db.func.max(Message.created_on), Message.message, Message.room_id) \
+            .group_by(Message.room_id).subquery()
+
+        # алиасы для запроса
+        r, u = db.aliased(Room), db.aliased(User)
+
+        # запрос на получение комнаты, пользователя-собеседника и последнего сообщения
+        room_user_records = RoomUserRecord.query \
+            .join(r, r.id == RoomUserRecord.room_id) \
+            .join(u, u.id == RoomUserRecord.target_user_id) \
+            .outerjoin(sub_query, sub_query.c.room_id == RoomUserRecord.room_id) \
+            .with_entities(r, u, sub_query) \
+            .filter(RoomUserRecord.user_id == authed_user.user_id).all()
+
+        print(room_user_records)
+        for (z, y, message_created_on, message, room_id) in room_user_records:
+            d = {}
+            if z is not None:
+                d["room"] = Room.serialize(z)
+            if y is not None:
+                d["user"] = User.serialize(y)
+            if message is not None:
+                d["last_message"] = message
+            result.append(d)
+    else:
+        err = 'Unexpected error'
+
+    return jsonify({'err': err, 'result': result})
+
+
+@app.route('/send_message', methods=['POST'])
+@validate_json
+def send_message():
+    user_json = request.json
+    err = ''
+    success = True
+    user_random_hash = request.args.get('user_random_hash')
+    authed_user = db.session.query(AuthedUser).filter_by(user_random_hash=user_random_hash).first()
+    if authed_user:
+        db.session.add(Message(id=user_json["id"], message=user_json["message"], from_user_id=authed_user.user_id,
+                               room_id=user_json["room_id"], created_on=datetime.now()))
+        db.session.commit()
+    else:
+        err = 'Unexpected error'
+        success = False
+    return jsonify({'error': err, 'result': success})
+
+
+@app.route('/fetch_messages', methods=['GET'])
+@require_auth_token
+def fetch_messages():
+    err = ''
+    result = ''
+    user_random_hash = request.args.get('user_random_hash')
+    room_id = request.args.get('room_id')
+    authed_user = db.session.query(AuthedUser).filter_by(user_random_hash=user_random_hash).first()
+    if authed_user:
+
+        messages = db.session.query(Message).filter_by(room_id=room_id).all()
+        result = Message.serialize_list(messages)
+        print(result)
+    else:
+        err = 'Unexpected error'
+
+    return jsonify(result)
+
+
+@app.route('/create_room', methods=['GET'])
+@require_auth_token
+def create_room():
+    err = ''
+    result = ''
+    user_random_hash = request.args.get('user_random_hash')
+    target_user_id = request.args.get('target_user_id')
+    authed_user = db.session.query(AuthedUser).filter_by(user_random_hash=user_random_hash).first()
+    room_id = ''
+    if authed_user:
+        has_match = db.session.query(SwipeRight).filter_by(swiper_id=authed_user.user_id,
+                                                           target_id=target_user_id).first()
+        if has_match:
+            room_id = uuid.uuid4().hex
+            room = Room(id=room_id, unique_users_id=authed_user.user_id + target_user_id, opened_by=authed_user.user_id)
+            new_id = uuid.uuid4().hex
+            room_user_record1 = RoomUserRecord(id=new_id)
+            new_id = uuid.uuid4().hex
+            room_user_record2 = RoomUserRecord(id=new_id)
+
+            room_user_record1.room = room
+            room_user_record2.room = room
+            user1 = User.query.filter(User.id == target_user_id).first()
+            user2 = User.query.filter(User.id == authed_user.user_id).first()
+            room_user_record1.user = user1
+            room_user_record2.user = user2
+            room_user_record1.target_user = user2
+            room_user_record2.target_user = user1
+            room.opened_by = user2
+            db.session.add(room)
+            db.session.add(room_user_record1)
+            db.session.add(room_user_record2)
+            Match.query.filter_by(first_user_id=authed_user.user_id, second_user_id=target_user_id).delete()
+            Match.query.filter_by(first_user_id=authed_user.user_id, second_user_id=target_user_id).delete()
+            db.session.commit()
+        else:
+            err = 'Cannot create a room - Not a match'
+
+    else:
+        err = 'Unexpected error'
+
+    return jsonify({'error': err, 'result': room_id})
 
 
 if __name__ == '__main__':
+    create_simple_data()
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port, debug=True)
