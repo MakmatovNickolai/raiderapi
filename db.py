@@ -40,6 +40,8 @@ class User(db.Model, Serializer):
     age = db.Column(db.Integer)
     picture_url = db.Column(db.String(140))
     sex = db.Column(db.String(10))
+    long = db.Column(db.Float)
+    lat = db.Column(db.Float)
     email = db.Column(db.String(64), index=True, unique=True)
     password = db.Column(db.String(128))
 
@@ -151,7 +153,9 @@ def create_simple_data():
                 surname="brata",
                 age="23",
                 sex="female",
-                picture_url="https://raiders3225357-dev.s3.eu-central-1.amazonaws.com/public/b68dd7dec11fc8914ab78e93713eaab6d5a8a4ff1022b90ded64cdf0b06213b1.jpg")
+                picture_url="https://raiders3225357-dev.s3.eu-central-1.amazonaws.com/public/b68dd7dec11fc8914ab78e93713eaab6d5a8a4ff1022b90ded64cdf0b06213b1.jpg",
+                 long =-86.1519681,
+                 lat=39.7612992)
 
     db.session.add(user1)
     id = uuid.uuid4().hex
@@ -162,6 +166,8 @@ def create_simple_data():
                 surname="brata",
                 age="23",
                 sex="female",
+                 long=-86.158436,
+                 lat=39.762241,
                 picture_url="https://raiders3225357-dev.s3.eu-central-1.amazonaws.com/public/f4b9d68ae31fc834dc25811867fd2049ffed5810a9a74e8390710a39ed6068b0.jpg")
     db.session.add(user2)
     id = uuid.uuid4().hex
@@ -172,6 +178,8 @@ def create_simple_data():
                 surname="brata",
                 age="23",
                 sex="female",
+                 long=-86.148436,
+                 lat=41.762241,
                 picture_url="https://raiders3225357-dev.s3.eu-central-1.amazonaws.com/public/f636a5e41467e9101b9cbe1ba67f3edd51a697bd6f4ed9d503853986cb8ca5b1.jpg")
     db.session.add(user5)
     id = uuid.uuid4().hex
@@ -181,6 +189,8 @@ def create_simple_data():
                 name="Xer.fr",
                 surname="brata",
                 age="23",
+                 long=-86.258436,
+                 lat=39.662241,
                 sex="female",
                 picture_url="https://raiders3225357-dev.s3.eu-central-1.amazonaws.com/public/88571be52a03b7fef4301def71017ecb785d6480082b5ed9dd83fc5898f5ac19.jpg")
     db.session.add(user3)
@@ -191,6 +201,8 @@ def create_simple_data():
                 name="Xer.se",
                 surname="brata",
                 age="23",
+                 long=-86.1519750,
+                 lat=39.7622290,
                 sex="female",
                 picture_url="https://raiders3225357-dev.s3.eu-central-1.amazonaws.com/public/181219d9d3be79e0ed68ee74bdd9866596d9591939ddfcd544380e174e432ae3.jpg")
     db.session.add(user4)
@@ -201,6 +213,8 @@ def create_simple_data():
                  name="Xer.da",
                  surname="brata",
                  age="23",
+                 long=-86.1578917,
+                 lat=39.7622292,
                  sex="female",
                  picture_url="https://raiders3225357-dev.s3.eu-central-1.amazonaws.com/public/7e8682d4bc75c57807e00cad0ffe0b7a8161d1537c8bfe8a5340ddb2896e8e85.jpg")
     db.session.add(user4)

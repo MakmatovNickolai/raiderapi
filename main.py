@@ -5,7 +5,9 @@ from flask import request, jsonify
 from sqlalchemy.exc import DatabaseError
 import hashlib
 
+from config import pusher_client
 from db import *
+from utils import *
 from wrappers import validate_json, require_auth_token
 
 
@@ -106,18 +108,29 @@ def fetch_users():
     user_random_hash = request.args.get('user_random_hash')
     authed_user = db.session.query(AuthedUser).filter_by(user_random_hash=user_random_hash).first()
     if authed_user:
-
+        
         right_ids = [r.target_id for r in
                      db.session.query(SwipeRight.target_id).filter_by(swiper_id=authed_user.user_id).all()]
         left_ids = [r.target_id for r in
                     db.session.query(SwipeLeft.target_id).filter_by(swiper_id=authed_user.user_id).all()]
 
+
+
+
         # возвращаем тех, кого не свайпали влево или вправо и не себя
         users_list = right_ids + left_ids
         if authed_user.user_id not in users_list:
             users_list.append(authed_user.user_id)
+
+        # супер не оптимизированно, но пох
         users = db.session.query(User).filter(User.id.notin_(users_list)).all()
-        result = User.serialize_list(users)
+
+        me = db.session.query(User).filter_by(id=authed_user.user_id).first()
+
+        # тотально медленно
+        closest_users = closest(users, me)
+
+        result = User.serialize_list(closest_users)
     else:
         err = 'Unexpected error'
 
@@ -235,9 +248,11 @@ def send_message():
     user_random_hash = request.args.get('user_random_hash')
     authed_user = db.session.query(AuthedUser).filter_by(user_random_hash=user_random_hash).first()
     if authed_user:
-        db.session.add(Message(id=user_json["id"], message=user_json["message"], from_user_id=authed_user.user_id,
-                               room_id=user_json["room_id"], created_on=datetime.now()))
+        message = Message(id=user_json["id"], message=user_json["message"], from_user_id=authed_user.user_id,
+                room_id=user_json["room_id"], created_on=datetime.now())
+        db.session.add(message)
         db.session.commit()
+        pusher_client.trigger('raider', 'new_message', {'message': Message.serialize(message)})
     else:
         err = 'Unexpected error'
         success = False
@@ -257,6 +272,26 @@ def fetch_messages():
         messages = db.session.query(Message).filter_by(room_id=room_id).all()
         result = Message.serialize_list(messages)
         print(result)
+    else:
+        err = 'Unexpected error'
+
+    return jsonify(result)
+
+
+@app.route('/update_location', methods=['GET'])
+@require_auth_token
+def update_location():
+    err = ''
+    result = ''
+    user_random_hash = request.args.get('user_random_hash')
+    long = request.args.get('long')
+    lat = request.args.get('lat')
+    authed_user = db.session.query(AuthedUser).filter_by(user_random_hash=user_random_hash).first()
+    if authed_user:
+        user = db.session.query(User).filter_by(id=authed_user.user_id).first()
+        user.long = long
+        user.lat = lat
+        db.session.commit()
     else:
         err = 'Unexpected error'
 
