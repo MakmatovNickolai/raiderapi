@@ -14,11 +14,15 @@ wrappers.initialize_error_handlers(app)
 current_directory = os.getcwd()
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS '] = False
 system = system()
-sqlite_connection_string = f'sqlite:////{current_directory}/database.db'
+
+# sqlite на бутылку отправлятся через 24 часа на хероку, надо ставить постргрес
+#sqlite_connection_string = f'sqlite:////{current_directory}/database.db'
+sqlite_connection_string = f'sqlite://// postgresql-clear-67820'
+DATABASE_URL = os.environ['DATABASE_URL']
 if system == "Windows":
     sqlite_connection_string = f'sqlite:///{current_directory}\\database.db'
 
-app.config['SQLALCHEMY_DATABASE_URI'] = sqlite_connection_string
+app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
 
 Salt = "ser_suhkra"
 
