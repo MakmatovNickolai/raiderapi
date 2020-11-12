@@ -44,14 +44,14 @@ class User(db.Model, Serializer):
     id = db.Column(db.String, primary_key=True)
     name = db.Column(db.String(140))
     city = db.Column(db.String(140))
-    description = db.Column(db.String(140))
+    description = db.Column(db.String(500))
     age = db.Column(db.Integer)
     sex = db.Column(db.String(10))
     long = db.Column(db.Float)
     lat = db.Column(db.Float)
     email = db.Column(db.String(64), index=True, unique=True)
     password = db.Column(db.String(128))
-    main_picture_url = db.Column(db.String(128))
+    main_picture_url = db.Column(db.String(500))
     picture_urls = db.relationship('PictureUrl', backref='user', lazy='dynamic')
 
 
