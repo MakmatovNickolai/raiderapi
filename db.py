@@ -175,7 +175,7 @@ def create_simple_data():
                  city="brata",
                 description="brata",
                  age="23",
-                 sex="female",
+                 sex="Мужчина",
                  long=-86.1519681,
                  lat=39.7612992,
                 main_picture_url="https://raiders3225357-dev.s3.eu-central-1.amazonaws.com/public/b68dd7dec11fc8914ab78e93713eaab6d5a8a4ff1022b90ded64cdf0b06213b1.jpg")
@@ -195,7 +195,7 @@ def create_simple_data():
                  name="Xer.com",
                  city="brata",
                  age="23",
-                 sex="female",
+                 sex="Женщина",
                 description="brata",
                  long=-86.158436,
                  lat=39.762241,
@@ -219,7 +219,7 @@ def create_simple_data():
                 city="brata",
                 age="23",
                 description="brata",
-                sex="female",
+                sex="Женщина",
                 long=-86.148436,
                 lat=41.762241,
                 main_picture_url="https://raiders3225357-dev.s3.eu-central-1.amazonaws.com/public/2f576b87bc5b58bef615471878c0f16c4a3211d181a94c3720f7aa722de5eda3.jpg"
@@ -243,7 +243,7 @@ def create_simple_data():
                 description="brata",
                  long=-86.258436,
                  lat=39.662241,
-                sex="female",
+                sex="Женщина",
                 main_picture_url="https://raiders3225357-dev.s3.eu-central-1.amazonaws.com/public/5929d1a7ecd860bf0b6f0b5949a336ed70fd10b94375442f6ec6808bd30d08a3.jpg"
                 )
     db.session.add(user)
@@ -263,7 +263,7 @@ def create_simple_data():
                 age="23",
                  long=-86.1519750,
                  lat=39.7622290,
-                sex="female",
+                sex="Мужчина",
                 main_picture_url="https://raiders3225357-dev.s3.eu-central-1.amazonaws.com/public/181219d9d3be79e0ed68ee74bdd9866596d9591939ddfcd544380e174e432ae3.jpg"
                 )
     db.session.add(user)
@@ -286,7 +286,7 @@ def create_simple_data():
                  age="23",
                  long=-86.1578917,
                  lat=39.7622292,
-                 sex="female",
+                 sex="Мужчина",
                  main_picture_url="https://raiders3225357-dev.s3.eu-central-1.amazonaws.com/public/7e8682d4bc75c57807e00cad0ffe0b7a8161d1537c8bfe8a5340ddb2896e8e85.jpg"
                  )
     db.session.add(user)

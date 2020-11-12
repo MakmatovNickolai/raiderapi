@@ -32,7 +32,6 @@ def sign_up():
                 main_picture_url=user_json["main_picture_url"],
                 description=user_json["description"])
 
-    # TODO доделать с фотками регистрацию
     for picture_url in user_json["picture_urls"]:
         db.session.add(PictureUrl(url=picture_url, user_id=user.id))
     err = ''
@@ -147,8 +146,6 @@ def fetch_users():
     # TODO перепроверить почему через день кидает в unexpected error
     if authed_user:
 
-        # TODO добавить фильтрацию по полу
-
         right_ids = [r.target_id for r in
                      db.session.query(SwipeRight.target_id).filter_by(swiper_id=authed_user.user_id).all()]
         left_ids = [r.target_id for r in
@@ -198,12 +195,14 @@ def get_matches():
                 .all()
             result = user_schema.dump(matched_users)
         if match_type == "one":
-            sub_query = db.session.query(SwipeRight.target_id).filter_by(swiper_id=authed_user.user_id).subquery()
+            # очередной супер неоптимальный запрос в базу
+            sub_query1 = db.session.query(SwipeRight.target_id).filter_by(swiper_id=authed_user.user_id).subquery()
+            sub_query2 = db.session.query(SwipeLeft.target_id).filter_by(swiper_id=authed_user.user_id).subquery()
             u = db.aliased(User)
             swiped_me_right_users = db.session.query(SwipeRight) \
                 .join(u, u.id == SwipeRight.swiper_id) \
                 .with_entities(u) \
-                .filter(SwipeRight.swiper_id.notin_(sub_query), SwipeRight.target_id == authed_user.user_id) \
+                .filter(SwipeRight.swiper_id.notin_(sub_query1), SwipeRight.swiper_id.notin_(sub_query2), SwipeRight.target_id == authed_user.user_id) \
                 .all()
             result = user_schema.dump(swiped_me_right_users)
     else:
@@ -361,9 +360,6 @@ def update_profile_info():
         user.sex = user_json["sex"]
         user.description = user_json["description"]
         user.city = user_json["city"]
-
-
-        # TODO удаление фото сделать (надо проверить)
 
         # обновляем главную фотку
         user.main_picture_url = user_json["main_picture_url"]
