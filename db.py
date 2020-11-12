@@ -18,11 +18,11 @@ system = system()
 # sqlite на бутылку отправлятся через 24 часа на хероку, надо ставить постргрес
 #sqlite_connection_string = f'sqlite:////{current_directory}/database.db'
 sqlite_connection_string = f'sqlite://// postgresql-clear-67820'
-DATABASE_URL = os.environ['DATABASE_URL']
+#DATABASE_URL = os.environ['DATABASE_URL']
 if system == "Windows":
     sqlite_connection_string = f'sqlite:///{current_directory}\\database.db'
 
-app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
+app.config['SQLALCHEMY_DATABASE_URI'] = f'postgres://opzcbdrwirilmk:d232d2aeb02cc0d2c6141b142dbb09fc4c7183f7ca43c6a406cfeb95deab4de8@ec2-54-246-115-40.eu-west-1.compute.amazonaws.com:5432/d2t97cbaqer4b1'
 
 Salt = "ser_suhkra"
 
